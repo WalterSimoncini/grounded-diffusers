@@ -1,7 +1,12 @@
+import os
 import torch
 import numpy as np
 
 from enum import Enum
+from typing import Tuple
+
+from diffusers import StableDiffusionPipeline
+from grounded_unet import GroundedUNet2DConditionModel
 
 
 class TrainingType(Enum):
@@ -79,3 +84,32 @@ def preprocess_mask(mask: torch.Tensor):
     mask[probabilities > 0.5] = 1
 
     return mask[0].cpu().numpy()
+
+
+def load_stable_diffusion(
+    model_name: str,
+    device: torch.device,
+    temp_dir="temp"
+) -> Tuple[StableDiffusionPipeline, GroundedUNet2DConditionModel]:
+    # Load the stable diffusion pipeline
+    pipeline = StableDiffusionPipeline.from_pretrained(model_name).to(device)
+
+    # Save the pretrained UNet to disk
+    model_type = model_name.split("/")[-1]
+
+    unet_model_dir = os.path.join("unet_model", model_type)
+    pretrained_unet_dir = os.path.join(temp_dir, unet_model_dir)
+
+    pipeline_components = pipeline.components
+
+    if not os.path.isdir(pretrained_unet_dir):
+        pipeline_components["unet"].save_pretrained(pretrained_unet_dir)
+
+    # Reload the UNet as the grounded subclass
+    grounded_unet = GroundedUNet2DConditionModel.from_pretrained(
+        pretrained_unet_dir
+    ).to(device)
+
+    pipeline_components["unet"] = grounded_unet
+
+    return StableDiffusionPipeline(**pipeline_components), grounded_unet
