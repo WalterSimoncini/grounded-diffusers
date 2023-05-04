@@ -15,5 +15,5 @@ pip install gdown
 
 mkdir -p ./mmdetection/checkpoint
 
-gdown "https://drive.google.com/uc?id=1JbJ7tWB15DzCB9pfLKnUHglckumOdUio" -o ./mmdetection/checkpoint/mask_rcnn_swin-s-p4-w7_fpn_fp16_ms-crop-3x_coco_20210903_104808-b92c91f1.pth
-gdown "https://drive.google.com/uc?id=1cLn-C39MPyc-DaFqaE6FVDHC3cgM4l8z" -o ./mmdetection/checkpoint/grounding_module.pth
+gdown "https://drive.google.com/uc?id=1JbJ7tWB15DzCB9pfLKnUHglckumOdUio" -O ./mmdetection/checkpoint/mask_rcnn_swin-s-p4-w7_fpn_fp16_ms-crop-3x_coco_20210903_104808-b92c91f1.pth
+gdown "https://drive.google.com/uc?id=1cLn-C39MPyc-DaFqaE6FVDHC3cgM4l8z" -O ./mmdetection/checkpoint/grounding_module.pth

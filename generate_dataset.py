@@ -54,6 +54,7 @@ for i in range(total_samples):
     print(f"generating sample {i}")
 
     # Pick a class
+    # FIXME: Use uniform sampling
     picked_class = random.choice(train_classes)
     class_index = coco_classes[picked_class]
 
@@ -79,6 +80,11 @@ for i in range(total_samples):
     ).pop()
 
     # Get Mask R-CNN mask tensor
+    if len(segmentation[class_index]) == 0:
+      print(f"no mask detected for class {picked_class}. skipping")
+
+      continue
+
     segmented_class = segmentation[class_index][0].astype(int)
 
     # For each sample we want to save
