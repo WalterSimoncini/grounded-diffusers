@@ -104,6 +104,8 @@ for i in range(len(images_list)):
     # Move the UNet features to cuda
     for key in unet_features.keys():
         unet_features[key] = [x.to(device) for x in unet_features[key]]
+    
+    # Expects the label as a list 
     total_loss_per_image = 0
     for k in range(len(label)):
         label_new = label[k]
