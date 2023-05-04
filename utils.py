@@ -3,7 +3,7 @@ import torch
 import numpy as np
 
 from enum import Enum
-from typing import Tuple
+from typing import Tuple, List
 
 from diffusers import StableDiffusionPipeline
 from grounded_unet import GroundedUNet2DConditionModel
@@ -125,3 +125,18 @@ def get_embeddings(tokenizer, embedder, device: torch.device, prompt: str, batch
   token_embeddings = token_embeddings[:, len(tokens["input_ids"]), :].to(device)
 
   return token_embeddings.repeat(batch_size, 1, 1)
+
+
+def has_mask_for_classes(masks: List[List], class_indices: List[int]) -> bool:
+    """
+        Returns whether the Mask R-CNN segmentation has
+        a mask for all the given classes. masks is an array
+        of masks (one per available class) as returned by
+        Mask R-CNN.
+    """
+    for class_index in class_indices:
+      # Get Mask R-CNN mask tensor
+      if len(masks[class_index]) == 0:
+        return False
+
+    return True

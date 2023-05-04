@@ -81,7 +81,7 @@ total_steps = len(training_samples)
 if total_steps == 0:
     print(
         f"{data_path} does not contain any data. "
-        "make sure you added a training / to the data_path"
+        "make sure you added a trailing / to the data_path"
     )
 
 # Do a single pass over all the data sample

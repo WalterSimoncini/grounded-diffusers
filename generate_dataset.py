@@ -5,11 +5,13 @@ import pickle
 import random
 import numpy as np
 
-from data import SegmentationSample
-from utils import load_stable_diffusion
+from data import MultiClassSegmentationSample
 from mmdet.apis import init_detector, inference_detector
+from utils import load_stable_diffusion, has_mask_for_classes
 
 
+# the number of classes in a single sample
+n_classes = 2
 total_samples = 500
 output_dir = "dataset"
 pascal_class_split = 1
@@ -51,14 +53,15 @@ execution_time = int(time.time())
 pipeline, grounded_unet = load_stable_diffusion(model_name=model_name, device=device)
 
 for i in range(total_samples):
-    print(f"generating sample {i}")
+    # Pick classes
+    picked_classes = random.sample(train_classes, n_classes)
+    class_indices = [coco_classes[x] for x in picked_classes]
 
-    # Pick a class
-    # FIXME: Use uniform sampling
-    picked_class = random.choice(train_classes)
-    class_index = coco_classes[picked_class]
+    # Build a prompt
+    prompt_classes = " and a ".join(picked_classes)
+    prompt = f"a photograph of a {prompt_classes}"
 
-    prompt = f"a photograph of a {picked_class}"
+    print(f"generating sample {i} for classes {picked_classes}")
 
     grounded_unet.clear_grounding_features()
 
@@ -79,28 +82,34 @@ for i in range(total_samples):
         [array_image]
     ).pop()
 
-    # Get Mask R-CNN mask tensor
-    if len(segmentation[class_index]) == 0:
-      print(f"no mask detected for class {picked_class}. skipping")
+    has_masks = has_mask_for_classes(
+        masks=segmentation,
+        class_indices=class_indices
+    )
 
-      continue
+    if not has_masks:
+        continue
 
-    segmented_class = segmentation[class_index][0].astype(int)
+    segmented_classes = [
+        segmentation[class_index][0].astype(int)
+        for class_index in class_indices
+    ]
 
     # For each sample we want to save
     #
     # the generated image
+    # The mask R-CNN masks
     # the UNet features dict
-    # The class name
-    # The mask R-CNN mask
-    sample = SegmentationSample(
+    # The class names
+    sample = MultiClassSegmentationSample(
         image=array_image,
-        mask=segmented_class,
+        masks=segmented_classes,
         unet_features=unet_features,
-        label=picked_class
+        labels=picked_classes
     )
-    
+
     image.save(os.path.join(images_dir, f"{execution_time}_{i}.png"))
+
     pickle.dump(
         sample,
         open(os.path.join(samples_dir, f"{execution_time}_{i}.pk"), "wb")
