@@ -113,3 +113,15 @@ def load_stable_diffusion(
     pipeline_components["unet"] = grounded_unet
 
     return StableDiffusionPipeline(**pipeline_components), grounded_unet
+
+
+def get_embeddings(tokenizer, embedder, device: torch.device, prompt: str, batch_size: int):
+  tokens = tokenizer(prompt, return_tensors="pt")
+
+  tokens["input_ids"] = tokens["input_ids"].to(device)
+  tokens["attention_mask"] = tokens["attention_mask"].to(device)
+
+  token_embeddings = embedder(**tokens).last_hidden_state
+  token_embeddings = token_embeddings[:, len(tokens["input_ids"]), :].to(device)
+
+  return token_embeddings.repeat(batch_size, 1, 1)

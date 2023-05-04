@@ -1,20 +1,7 @@
-# Yeah, try scheduling another training loop. We need to:
-
-# 1. Fix the training script
-# 2. Update the SegModule to only use the 9 feature maps -- OK
-# 3. Check if it trains
-# 4. Figure out how long it takes to train
-# 5. Maybe run a couple epochs and test if it does anything
-
-# ------------
-
-# Other TODOS:
-
-# 1. Unpack and analyze CGD results (just cmnist is fine I guess)
-# 2. Schedule hyperparameters evaluation for the CGD step
-# 3. ???
-# 4. Profit
-
+"""
+  This script is a work in progress, and merges
+  sampling with training the grounding module
+"""
 import os
 import torch
 import random
@@ -106,6 +93,7 @@ pipeline = StableDiffusionPipeline(**pipeline_components)
 tokenizer = pipeline_components["tokenizer"]
 embedder = pipeline_components["text_encoder"]
 
+# FIXME: Use the one in utils.py
 def get_embeddings(prompt: str):
   tokens = tokenizer(prompt, return_tensors="pt")
 

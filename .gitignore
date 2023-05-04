@@ -163,3 +163,4 @@ checkpoints/*
 outputs/*
 *.DS_Store
 dataset/*
+dataset-100-single-multi-class.tar.gz
