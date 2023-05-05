@@ -53,16 +53,12 @@ def plot_mask(img, masks, colors=None, alpha=0.8,indexlist=[0,1]) -> np.ndarray:
     return img.astype(np.uint8)
 
 
-def calculate_iou(mask1, mask2, threshold=180):
+def calculate_iou(mask1, mask2):
     assert mask1.shape == mask2.shape, "Masks must have the same shape."
-    
-    # Apply thresholding to the masks to convert them to binary format.
-    binary_mask1 = np.where(mask1 >= threshold, 1, 0)
-    binary_mask2 = np.where(mask2 >= threshold, 1, 0)
 
     # Calculate intersection and union.
-    intersection = np.logical_and(binary_mask1, binary_mask2)
-    union = np.logical_or(binary_mask1, binary_mask2)
+    intersection = np.logical_and(mask1, mask2)
+    union = np.logical_or(mask1, mask2)
 
     # Count the number of pixels in the intersection and union.
     intersection_count = np.sum(intersection)

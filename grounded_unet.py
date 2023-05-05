@@ -18,20 +18,33 @@ class GroundedUNet2DConditionModel(UNet2DConditionModel):
         except AttributeError:
             self.grounding_features_dict = defaultdict(list)
 
+        # Stable Diffusion 1 uses shapes 8, 16, 32, 64
+        # while version 2 uses shapes 12, 24, 48, 96
         feature_key = {
             8: "low",
+            12: "low",
             16: "mid",
+            24: "mid",
             32: "high",
+            48: "high",
             64: "highest",
+            96: "highest"
         }.get(sample.size()[2], None)
 
         if feature_key is not None:
-            self.grounding_features_dict[feature_key].append(sample.detach().reshape(
-                int(sample.size()[0]/2),
-                int(sample.size()[1] * 2),
-                sample.size()[2],
-                sample.size()[3]
-            ))
+            sample = sample.detach()
+
+            if sample.shape[0] == 2:
+                # Stable Diffusion 1's first dimension is 2, so we reshape it
+                self.grounding_features_dict[feature_key].append(sample.reshape(
+                    int(sample.size()[0] / 2),
+                    int(sample.size()[1] * 2),
+                    sample.size()[2],
+                    sample.size()[3]
+                ))
+            else:
+                # Stable Diffusion's 2 first dimension is 1
+                self.grounding_features_dict[feature_key].append(sample)
         else:
             print(f"No feature key for tensor {sample.shape} at timestep {timestep}")
 
