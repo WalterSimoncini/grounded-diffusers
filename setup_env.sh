@@ -13,6 +13,7 @@ pip install diffusers
 pip install taming-transformers-rom1504 
 pip install black
 pip install gdown
+pip install pyiqa
 
 mkdir -p ./mmdetection/checkpoint
 
