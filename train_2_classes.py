@@ -24,8 +24,8 @@ device = torch.device("cuda")
 pascal_class_split = 1
 model_name = "runwayml/stable-diffusion-v1-5"
 model_type = model_name.split("/")[-1]
-images_path = "/home/lcur0899/grounded-diffusers/dataset/single_class/images/"
-features_path = "/home/lcur0899/grounded-diffusers/dataset/single_class/samples/"
+images_path = "/home/lcur0899/grounded-diffusers/dataset/one_image/images/"
+features_path = "/home/lcur0899/grounded-diffusers/dataset/one_image/samples/"
 batch_size = 1
 learning_rate = 1e-5
 
@@ -96,11 +96,12 @@ for i in range(len(images_list)):
     objects = []
     with open(full_feature_path, "rb") as openfile:
         objects.append(pickle.load(openfile))
+
     # Get the UNet features, label and segmentation mask for the image
     for obj in objects:
         unet_features = obj.unet_features
-        label = obj.label
-        segmentation = obj.mask
+        label = obj.labels
+        segmentation = obj.masks
     # Move the UNet features to cuda
     for key in unet_features.keys():
         unet_features[key] = [x.to(device) for x in unet_features[key]]
@@ -127,7 +128,7 @@ for i in range(len(images_list)):
         )
 
         segmentation_new = (
-            torch.from_numpy(segmentation).unsqueeze(0).unsqueeze(0).to(device)
+            torch.from_numpy(segmentation[k]).unsqueeze(0).unsqueeze(0).to(device)
         )
         loss = loss_fn(fusion_segmentation_pred, segmentation_new.float())
         total_loss_per_image += loss
