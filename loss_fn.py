@@ -14,8 +14,8 @@ class DiceLoss(nn.Module):
     def forward(self, preds, target):
         """
         inputs:
-            logits: tensor of shape (N, H, W, ...)
-            label: tensor of shape(N, H, W, ...)
+            logits: tensor of shape (N, C, H, W)
+            label: tensor of shape(N, C, H, W)
         output:
             loss: tensor of shape(1, )
         """
@@ -38,8 +38,8 @@ class BCEDiceLoss(nn.Module):
     def forward(self, preds, target):
         """
         inputs:
-            logits: tensor of shape (N, H, W, ...)
-            label: tensor of shape(N, H, W, ...)
+            logits: tensor of shape (N, C, H, W)
+            label: tensor of shape(N, C, H, W)
         output:
             loss: tensor of shape(1, )
         """
@@ -62,8 +62,8 @@ class BCELogCoshDiceLoss(nn.Module):
     def forward(self, preds, target):
         """
         inputs:
-            logits: tensor of shape (N, H, W, ...)
-            label: tensor of shape(N, H, W, ...)
+            logits: tensor of shape (N, C, H, W)
+            label: tensor of shape(N, C, H, W)
         output:
             loss: tensor of shape(1, )
         """
