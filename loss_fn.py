@@ -14,8 +14,8 @@ class DiceLoss(nn.Module):
     def forward(self, preds, target):
         """
         inputs:
-            logits: tensor of shape (N, H, W, ...)
-            label: tensor of shape(N, H, W, ...)
+            logits: tensor of shape (N, C, H, W)
+            label: tensor of shape(N, C, H, W)
         output:
             loss: tensor of shape(1, )
         """
@@ -38,8 +38,8 @@ class BCEDiceLoss(nn.Module):
     def forward(self, preds, target):
         """
         inputs:
-            logits: tensor of shape (N, H, W, ...)
-            label: tensor of shape(N, H, W, ...)
+            logits: tensor of shape (N, C, H, W)
+            label: tensor of shape(N, C, H, W)
         output:
             loss: tensor of shape(1, )
         """
@@ -51,4 +51,27 @@ class BCEDiceLoss(nn.Module):
         dice_loss = 1.0 - (2 * numer + self.smooth) / (denor + self.smooth)
         bce = loss_bce(preds, target)
         loss = dice_loss + bce
+        return loss
+
+
+class BCELogCoshDiceLoss(nn.Module):
+    def __init__(self, smooth=1):
+        super(BCELogCoshDiceLoss, self).__init__()
+        self.smooth = smooth
+
+    def forward(self, preds, target):
+        """
+        inputs:
+            logits: tensor of shape (N, C, H, W)
+            label: tensor of shape(N, C, H, W)
+        output:
+            loss: tensor of shape(1, )
+        """
+        preds = torch.sigmoid(preds)
+        intersection = (preds * target).sum(dim=(2, 3))
+        union = (preds + target).sum(dim=(2, 3))
+        dice = (2.0 * intersection + self.smooth) / (union + self.smooth)
+        log_cosh_dice = torch.log(torch.cosh(1 - dice))
+        bce = loss_bce(preds, target)
+        loss = torch.mean(log_cosh_dice) + bce
         return loss
