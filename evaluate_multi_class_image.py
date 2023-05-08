@@ -7,7 +7,6 @@
 import os
 import glob
 import torch
-import torchvision
 import pickle
 import numpy as np
 
@@ -54,12 +53,6 @@ if total_steps == 0:
     )
 
 seg_module.eval()
-
-import open_clip
-import clip
-model, _, preprocess = open_clip.create_model_and_transforms('ViT-G/14', pretrained='laion2b_s34b_b79k', device=device)
-# tokenizer = get_tokenizer('ViT-B-32')
- 
 
 with torch.no_grad():
     # Do a single pass over all the data sample
