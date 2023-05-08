@@ -25,10 +25,12 @@ from utils import preprocess_mask, get_embeddings, plot_mask, calculate_iou
 
 
 batch_size = 1
-grounding_checkpoint = "checkpoints/run-May04_21-07-32/checkpoint_100.pth"
+# grounding_checkpoint = "checkpoints/run-May04_21-07-32/checkpoint_100.pth"
+grounding_checkpoint = "/home/lcur0899/grounded-diffusers1/saved_models/checkpoint_1000.pth"
 device = torch.device("cuda")
 model_name = "runwayml/stable-diffusion-v1-5"
-data_path = "dataset/samples/"
+# data_path = "dataset/samples/"
+data_path = "/home/lcur0899/grounded-diffusers1/dataset/single_class/samples/"
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
@@ -86,10 +88,6 @@ with torch.no_grad():
         fusion_segmentation_pred = fusion_segmentation[0, 0, :, :]
 
         fusion_mask = preprocess_mask(mask=fusion_segmentation_pred.unsqueeze(0))
-
-        import pdb
-
-        pdb.set_trace()
 
         iou = calculate_iou(segmentation, fusion_mask)
 
