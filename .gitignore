@@ -165,3 +165,6 @@ outputs/*
 dataset/*
 dataset-100-single-multi-class.tar.gz
 checkpoint_1000.pth
+playground.py
+data/*
+.vscode/*
