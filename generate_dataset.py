@@ -1,19 +1,21 @@
 import os
+import json
 import time
 import torch
 import pickle
 import random
 import numpy as np
 
-from data import MultiClassSegmentationSample
+from data import PromptsMultiClassSegmentationSample
 from mmdet.apis import init_detector, inference_detector
 from utils import load_stable_diffusion, has_mask_for_classes
+from utils.prompts import visual_adjectives_prompt
 
 
 # the number of classes in a single sample
 n_classes = 2
 total_samples = 500
-output_dir = "dataset"
+output_dir = "dataset_test"
 pascal_class_split = 1
 device = torch.device("cuda")
 model_name = "runwayml/stable-diffusion-v1-5"
@@ -42,6 +44,10 @@ pascal_classes = [c.split(",")[0] for c in pascal_classes]
 
 train_classes, test_classes = pascal_classes[:15], pascal_classes[15:]
 
+# Load visual adjectives for the classes and the possible camera configurations
+visual_adjectives = json.loads(open("config/visual_adjectives.json").read())
+camera_parameters = json.loads(open("config/camera.json").read())
+
 # Load Mask R-CNN
 pretrain_detector = init_detector(
   mask_rnn_config["config"],
@@ -57,11 +63,26 @@ for i in range(total_samples):
     picked_classes = random.sample(train_classes, n_classes)
     class_indices = [coco_classes[x] for x in picked_classes]
 
+    # Add visual adjectives to classes
+    visual_picked_classes = [
+        visual_adjectives_prompt(
+            label=label,
+            visual_adjectives=visual_adjectives
+        ) for label in picked_classes
+    ]
+
+    camera_angle = random.choice(camera_parameters["camera_angle"])
+    camera_position = random.choice(camera_parameters["camera_position"])
+
+    # Either pick a camera angle or a camera position
+    camera_parameter = random.choice([camera_angle, camera_position])
+
     # Build a prompt
-    prompt_classes = " and a ".join(picked_classes)
-    prompt = f"a photograph of a {prompt_classes}"
+    prompt_classes = " and a ".join(visual_picked_classes)
+    prompt = f"a photograph of a {prompt_classes} {camera_parameter}"
 
     print(f"generating sample {i} for classes {picked_classes}")
+    print(f"the prompt is: {prompt}")
 
     grounded_unet.clear_grounding_features()
 
@@ -88,6 +109,8 @@ for i in range(total_samples):
     )
 
     if not has_masks:
+        print(f"sample {i} is missing one or more masks")
+
         continue
 
     segmented_classes = [
@@ -101,11 +124,13 @@ for i in range(total_samples):
     # The mask R-CNN masks
     # the UNet features dict
     # The class names
-    sample = MultiClassSegmentationSample(
+    sample = PromptsMultiClassSegmentationSample(
         image=array_image,
         masks=segmented_classes,
         unet_features=unet_features,
-        labels=picked_classes
+        labels=picked_classes,
+        visual_labels=visual_picked_classes,
+        camera_parameters=[camera_parameter]
     )
 
     image.save(os.path.join(images_dir, f"{execution_time}_{i}.png"))

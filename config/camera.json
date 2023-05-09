@@ -1,0 +1,27 @@
+{
+    "camera_angle": [
+        "medium shot",
+        "mid-shot",
+        "waist shot",
+        "long shot",
+        "wide shot",
+        "full shot",
+        "extreme long shot",
+        "extreme wide shot"
+    ],
+    "camera_position": [
+        "overhead view",
+        "establishing shot",
+        "from above",
+        "high angle",
+        "crane shot",
+        "low angle",
+        "from below",
+        "worms-eye-view",
+        "aerial view",
+        "birds eye view",
+        "tilted frame",
+        "dutch angle",
+        "skewed shot"
+    ]
+}

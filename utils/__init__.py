@@ -36,9 +36,9 @@ def plot_mask(img, masks, colors=None, alpha=0.8,indexlist=[0,1]) -> np.ndarray:
         The image plotted with segmentation masks, shape `(H, W, 3)`
 
     """
-    H, W = masks.shape[0], masks.shape[1]
+    H, W = masks.shape[1], masks.shape[2]
     color_list=[[255,97,0],[128,42,42],[220,220,220],[255,153,18],[56,94,15],[127,255,212],[210,180,140],[221,160,221],[255,0,0],[255,128,0],[255,255,0],[128,255,0],[0,255,0],[0,255,128],[0,255,255],[0,128,255],[0,0,255],[128,0,255],[255,0,255],[255,0,128]]*6
-    final_color_list=[np.array([[i]*512]*512) for i in color_list]
+    final_color_list=[np.array([[i]*H]*W) for i in color_list]
     
     background=np.ones(img.shape)*255
     count=0
