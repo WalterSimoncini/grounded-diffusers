@@ -16,16 +16,21 @@ from seg_module import Segmodule
 from utils import preprocess_mask, get_embeddings, calculate_iou
 
 
+use_sd2 = True
 batch_size = 1
-grounding_checkpoint = "checkpoints/run-May08_13-07-43/checkpoint_1000.pth"
+grounding_checkpoint = "checkpoints/sd2-test/checkpoint_1000.pth"
 device = torch.device("cuda")
-model_name = "runwayml/stable-diffusion-v1-5"
-data_path = "data/sd1-5-unseen/samples/"
+model_name = "stabilityai/stable-diffusion-2" if use_sd2 else "runwayml/stable-diffusion-v1-5"
+data_path = "sd2-dataset/dataset-sd-2-v2/samples/"
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Load the segmentation module
-seg_module = Segmodule().to(device)
+seg_module = Segmodule(
+    use_sd2=use_sd2,
+    output_image_dim=768 if use_sd2 else 512
+).to(device)
+
 seg_module.load_state_dict(
     torch.load(grounding_checkpoint, map_location=device), strict=True
 )

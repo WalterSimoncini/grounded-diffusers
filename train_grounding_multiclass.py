@@ -20,13 +20,14 @@ from loss_fn import BCEDiceLoss, DiceLoss, BCELogCoshDiceLoss
 
 
 seed = 42
+use_sd2 = False
 pascal_class_split = 1
 loss_name = "log_cosh"
 checkpoints_dir = "checkpoints"
 device = torch.device("cuda")
-model_name = "runwayml/stable-diffusion-v1-5"
+model_name = "stabilityai/stable-diffusion-2" if use_sd2 else "runwayml/stable-diffusion-v1-5"
 data_path = "dataset/samples/"
-images_path = "dataset/images"
+images_path = "dataset/images/"
 learning_rate = 1e-5
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
@@ -45,7 +46,10 @@ pascal_classes = [c.split(",")[0] for c in pascal_classes]
 train_classes, test_classes = pascal_classes[:15], pascal_classes[15:]
 
 # Load the segmentation module
-seg_module = Segmodule().to(device)
+seg_module = Segmodule(
+    use_sd2=use_sd2,
+    output_image_dim=768 if use_sd2 else 512
+).to(device)
 
 # Load the stable diffusion pipeline
 pipeline = StableDiffusionPipeline.from_pretrained(model_name).to(device)

@@ -307,25 +307,33 @@ def get_embedder(multires, i=0):
 
 class Segmodule(nn.Module):
     
-    def __init__(self,
+    def __init__(
+        self,
         embedding_dim=512,
+        output_image_dim=512,
         num_heads=8,
         num_layers=3,
         hidden_dim=2048,
-        dropout_rate=0):
+        dropout_rate=0,
+        use_sd2=False
+    ):
         super().__init__()
+
+        self.use_sd2 = use_sd2
+        self.output_image_dim = output_image_dim
 
         low_feature_channel = 16
         mid_feature_channel = 32
         high_feature_channel = 64
         highest_feature_channel=128
         
-        # This should be 1280 * 3 * 2
+        # This should be 1280 * 3 * 2 for SD1, SD2
         self.low_feature_conv = nn.Sequential(
             nn.Conv2d(1280 * 3 * 2, low_feature_channel, kernel_size=1, bias=False)
         )
 
-        # Thid should be 1280 + 2560
+        # This should be 1280 + 2560 for SD1
+        # This should be 1280 + 2560 for SD2
         self.mid_feature_conv = nn.Sequential(
             nn.Conv2d(1280 + 2560, mid_feature_channel, kernel_size=1, bias=False)
         )
@@ -352,7 +360,7 @@ class Segmodule(nn.Module):
             upsample=False,
         )
 
-        # 640 + 2560
+        # 640 + 2560 for SD1, SD2
         self.high_feature_conv = nn.Sequential(
             nn.Conv2d(640 + 2560, high_feature_channel, kernel_size=1, bias=False),
         )
@@ -370,7 +378,8 @@ class Segmodule(nn.Module):
                                 activation=nn.ReLU(inplace=True),
                                 upsample=False,
                             )
-        # 1280 + 640
+
+        # 1280 + 640 for SD1, SD2
         self.highest_feature_conv = nn.Sequential(
             nn.Conv2d(1280 + 640, highest_feature_channel, kernel_size=1, bias=False),
         )
@@ -395,8 +404,9 @@ class Segmodule(nn.Module):
         decoder_layer = TransformerDecoderLayer(embedding_dim, num_heads, hidden_dim, dropout_rate)
         self.transfromer_decoder = TransformerDecoder(decoder_layer, num_layers)
         self.mlp = MLP(embedding_dim, embedding_dim, feature_dim, 3)
-        context_dim=768
-        
+
+        context_dim = 1024 if use_sd2 else 768
+
         self.to_k = nn.Linear(query_dim, embedding_dim, bias=False)
         self.to_q = nn.Linear(context_dim, embedding_dim, bias=False)
         
@@ -404,7 +414,7 @@ class Segmodule(nn.Module):
 
         image_feature=self._prepare_features(diffusion_feature)
 
-        final_image_feature=F.interpolate(image_feature, size=512, mode='bilinear', align_corners=False)
+        final_image_feature=F.interpolate(image_feature, size=self.output_image_dim, mode='bilinear', align_corners=False)
         b=final_image_feature.size()[0]
 
         patch_size = 4
@@ -428,10 +438,15 @@ class Segmodule(nn.Module):
         return seg_result
 
     def _prepare_features(self, features, upsample='bilinear'):
-        self.low_feature_size = 16
-        self.mid_feature_size = 32
-        self.high_feature_size = 64
-        
+        if self.use_sd2:
+            self.low_feature_size = 24
+            self.mid_feature_size = 48
+            self.high_feature_size = 96
+        else:
+            self.low_feature_size = 16
+            self.mid_feature_size = 32
+            self.high_feature_size = 64
+
         low_features = [
             F.interpolate(i, size=self.low_feature_size, mode=upsample, align_corners=False) for i in features["low"]
         ]

@@ -168,3 +168,5 @@ checkpoint_1000.pth
 playground.py
 data/*
 .vscode/*
+sd2-dataset/*
+dataset_test/*
