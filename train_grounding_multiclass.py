@@ -117,6 +117,7 @@ for step, file_path in enumerate(tqdm(training_samples)):
     step_loss = 0
 
     # FIXME: We could precompute these
+    # FIXME: WTF where is the photograph part
     prompt = " and a ".join(labels)
     label_embeddings = get_embeddings(
         tokenizer=tokenizer,
