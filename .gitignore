@@ -170,3 +170,5 @@ data/*
 .vscode/*
 sd2-dataset/*
 dataset_test/*
+dataset-test/*
+nohup.out
