@@ -162,6 +162,7 @@ for epoch in range(n_epochs):
             ).float()
 
             # Calculate the loss and run one training step
+            # FIXME: Try averaging the loss here
             step_loss += loss_fn(fusion_segmentation_pred, segmentation)
 
         optimizer.zero_grad()
