@@ -20,7 +20,7 @@ from loss_fn import BCEDiceLoss, DiceLoss, BCELogCoshDiceLoss
 
 
 seed = 42
-n_epochs = 3
+n_epochs = 6
 use_sd2 = False
 pascal_class_split = 1
 loss_name = "log_cosh"
@@ -49,7 +49,8 @@ train_classes, test_classes = pascal_classes[:15], pascal_classes[15:]
 # Load the segmentation module
 seg_module = Segmodule(
     use_sd2=use_sd2,
-    output_image_dim=768 if use_sd2 else 512
+    output_image_dim=768 if use_sd2 else 512,
+    dropout_rate=0.1
 ).to(device)
 
 # Load the stable diffusion pipeline
