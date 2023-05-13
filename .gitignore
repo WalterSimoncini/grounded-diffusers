@@ -172,3 +172,5 @@ sd2-dataset/*
 dataset_test/*
 dataset-test/*
 nohup.out
+val_dataset
+dataset-unseen

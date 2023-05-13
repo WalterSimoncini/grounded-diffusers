@@ -13,15 +13,18 @@ import numpy as np
 from tqdm import tqdm
 from diffusers import StableDiffusionPipeline
 from seg_module import Segmodule
-from utils import preprocess_mask, get_embeddings, calculate_iou
+from utils import preprocess_mask, get_embeddings, calculate_iou, seed_everything
 
 
-use_sd2 = True
+seed = 42
+use_sd2 = False
 batch_size = 1
-grounding_checkpoint = "checkpoints/sd2-test/checkpoint_1000.pth"
+grounding_checkpoint = "checkpoints/run-May13_11-16-27/checkpoint_9_1000.pth"
 device = torch.device("cuda")
 model_name = "stabilityai/stable-diffusion-2" if use_sd2 else "runwayml/stable-diffusion-v1-5"
-data_path = "sd2-dataset/dataset-sd-2-v2/samples/"
+data_path = "dataset-unseen/samples/"
+
+seed_everything(seed)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 

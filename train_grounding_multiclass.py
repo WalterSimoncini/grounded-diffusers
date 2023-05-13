@@ -15,20 +15,23 @@ from diffusers import StableDiffusionPipeline
 from torch.utils.tensorboard import SummaryWriter
 
 from seg_module import Segmodule
+from utils.evaluation import evaluate_seg_model
 from utils import preprocess_mask, get_embeddings, plot_mask
 from loss_fn import BCEDiceLoss, DiceLoss, BCELogCoshDiceLoss
 
 
 seed = 42
-n_epochs = 6
+n_epochs = 10
 use_sd2 = False
+visualize_examples = False
 pascal_class_split = 1
 loss_name = "log_cosh"
 checkpoints_dir = "checkpoints"
 device = torch.device("cuda")
 model_name = "stabilityai/stable-diffusion-2" if use_sd2 else "runwayml/stable-diffusion-v1-5"
-data_path = "dataset/samples/"
-images_path = "dataset/images/"
+train_data_path = "dataset/samples/"
+train_images_path = "dataset/images/"
+validation_data_path = "val_dataset/samples/"
 learning_rate = 1e-5
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
@@ -91,17 +94,23 @@ loss_fn = {
 
 optimizer = optim.Adam(params=seg_module.parameters(), lr=learning_rate)
 
-training_samples = glob.glob(data_path + "*.pk")
+best_val_miou, best_epoch = 0, 0
+
+training_samples = glob.glob(train_data_path + "*.pk")
+val_samples = glob.glob(validation_data_path + "*.pk")
+
 total_steps = len(training_samples)
 
 if total_steps == 0:
-    print(
-        f"{data_path} does not contain any data. "
-        "make sure you added a trailing / to the data_path"
-    )
+    print(f"{train_data_path} does not contain any data. make sure you added a trailing / to the path")
+
+if len(val_samples) == 0:
+    print(f"{validation_data_path} does not contain any data. make sure you added a trailing / to the path")
 
 for epoch in range(n_epochs):
     print(f"starting epoch {epoch}")
+
+    seg_module.train()
 
     # Do a single pass over all the data sample
     for step, file_path in enumerate(tqdm(training_samples)):
@@ -139,7 +148,7 @@ for epoch in range(n_epochs):
                 fusion_segmentation[0, 0, :, :], 0
             ).unsqueeze(0)
 
-            if step % 25 == 0:
+            if step % 25 == 0 and visualize_examples:
                 # FIXME: We should move these to Tensorboard
                 # Save the fusion module mask every 25 steps
                 fusion_mask = preprocess_mask(mask=fusion_segmentation_pred)
@@ -153,7 +162,7 @@ for epoch in range(n_epochs):
 
                 # Also plot the mask over the image
                 filename = file_path.split("/")[-1].replace(".pk", ".png")
-                image = Image.open(os.path.join(images_path, filename))
+                image = Image.open(os.path.join(train_images_path, filename))
 
                 masked_image = Image.fromarray(plot_mask(np.array(image), fusion_mask))
                 masked_image.save(os.path.join(training_dir, f"vis_image_{epoch}_{step}_{label}_masked.png"))
@@ -172,13 +181,45 @@ for epoch in range(n_epochs):
 
         torch_writer.add_scalar("train/loss", step_loss.item(), global_step=step)
 
-        print(f"training step: {step}/{total_steps}, loss: {step_loss}")
-
-        if step % 500 == 0:
+        if step % 500 == 0 and step > 0:
             # Save a checkpoint every 500 steps
-            print(f"saving checkpoint...")
-
             torch.save(
                 seg_module.state_dict(),
                 os.path.join(run_dir, f"checkpoint_{epoch}_{step}.pth")
             )
+
+    seg_module.eval()
+
+    with torch.no_grad():
+        # Evaluate on the training and validation sets
+        print(f"evaluating the model for epoch {epoch}")
+
+        train_miou = evaluate_seg_model(
+            model=seg_module,
+            tokenizer=tokenizer,
+            embedder=embedder,
+            device=device,
+            tokenizer_inverted_vocab=tokenizer_inverted_vocab,
+            samples_paths=training_samples
+        )
+
+        print(f"training mIoU: {train_miou}")
+
+        val_miou = evaluate_seg_model(
+            model=seg_module,
+            tokenizer=tokenizer,
+            embedder=embedder,
+            device=device,
+            tokenizer_inverted_vocab=tokenizer_inverted_vocab,
+            samples_paths=val_samples
+        )
+
+        if val_miou > best_val_miou:
+            best_val_miou = val_miou
+            best_epoch = epoch
+
+        print(f"validation mIoU: {val_miou}")
+        print(f"epoch {best_epoch} has the best validation mIoU ({best_val_miou})")
+
+        torch_writer.add_scalar("train/miou", train_miou, epoch)
+        torch_writer.add_scalar("val/miou", val_miou, epoch)
