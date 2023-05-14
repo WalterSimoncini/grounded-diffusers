@@ -315,12 +315,14 @@ class Segmodule(nn.Module):
         num_layers=3,
         hidden_dim=2048,
         dropout_rate=0,
+        dino_feature_size=4096,
         use_sd2=False
     ):
         super().__init__()
 
         self.use_sd2 = use_sd2
         self.output_image_dim = output_image_dim
+        self.dino_feature_size = dino_feature_size
 
         low_feature_channel = 16
         mid_feature_channel = 32
@@ -403,15 +405,14 @@ class Segmodule(nn.Module):
         query_dim=feature_dim*16
         decoder_layer = TransformerDecoderLayer(embedding_dim, num_heads, hidden_dim, dropout_rate)
         self.transfromer_decoder = TransformerDecoder(decoder_layer, num_layers)
-        self.mlp = MLP(embedding_dim, embedding_dim, feature_dim, 3)
+        self.mlp = MLP(embedding_dim + dino_feature_size, embedding_dim, feature_dim, 3)
 
         context_dim = 1024 if use_sd2 else 768
 
         self.to_k = nn.Linear(query_dim, embedding_dim, bias=False)
         self.to_q = nn.Linear(context_dim, embedding_dim, bias=False)
         
-    def forward(self,diffusion_feature,text_embedding):
-
+    def forward(self, diffusion_feature, text_embedding, dino_saliency_map):
         image_feature=self._prepare_features(diffusion_feature)
 
         final_image_feature=F.interpolate(image_feature, size=self.output_image_dim, mode='bilinear', align_corners=False)
@@ -432,8 +433,10 @@ class Segmodule(nn.Module):
         
         output_query=rearrange(output_query, '(b n) d -> b n d',b=b)
         
-        mask_embedding=self.mlp(output_query)
-        seg_result=einsum('b d h w, b n d -> b n h w', final_image_feature, mask_embedding)
+        mlp_feature = torch.cat([output_query.squeeze(dim=1), dino_saliency_map], dim=1)
+        mask_embedding=self.mlp(mlp_feature)
+
+        seg_result=einsum('b d h w, b n d -> b n h w', final_image_feature, mask_embedding.unsqueeze(dim=0))
         
         return seg_result
 

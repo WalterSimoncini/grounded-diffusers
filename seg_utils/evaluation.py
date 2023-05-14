@@ -26,6 +26,7 @@ def evaluate_seg_model(
         labels = sample.labels
         segmentations = sample.masks
         unet_features = sample.unet_features
+        saliency_map = sample.dino_saliency_map.to(device)
 
         # Move the UNet features to cpu
         for key in unet_features.keys():
@@ -42,9 +43,9 @@ def evaluate_seg_model(
             labels=labels,
             inverted_vocab=tokenizer_inverted_vocab
         )
-    
+
         for label, segmentation in zip(labels, segmentations):
-            fusion_segmentation = model(unet_features, label_embeddings[label])
+            fusion_segmentation = model(unet_features, label_embeddings[label], saliency_map)
             fusion_segmentation_pred = fusion_segmentation[0, 0, :, :]
             fusion_mask = preprocess_mask(mask=fusion_segmentation_pred.unsqueeze(0))
 

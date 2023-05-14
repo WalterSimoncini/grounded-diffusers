@@ -15,8 +15,8 @@ from diffusers import StableDiffusionPipeline
 from torch.utils.tensorboard import SummaryWriter
 
 from seg_module import Segmodule
-from utils.evaluation import evaluate_seg_model
-from utils import preprocess_mask, get_embeddings, plot_mask
+from seg_utils.evaluation import evaluate_seg_model
+from seg_utils import preprocess_mask, get_embeddings, plot_mask
 from loss_fn import BCEDiceLoss, DiceLoss, BCELogCoshDiceLoss
 
 
@@ -29,9 +29,10 @@ loss_name = "log_cosh"
 checkpoints_dir = "checkpoints"
 device = torch.device("cuda")
 model_name = "stabilityai/stable-diffusion-2" if use_sd2 else "runwayml/stable-diffusion-v1-5"
-train_data_path = "dataset/samples/"
+train_data_path = "dataset/updated-samples/"
 train_images_path = "dataset/images/"
-validation_data_path = "val_dataset/samples/"
+validation_data_path = "val_dataset/updated-samples/"
+validation_images_path = "val_dataset/images/"
 learning_rate = 1e-5
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
@@ -123,6 +124,7 @@ for epoch in range(n_epochs):
         labels = sample.labels
         segmentations = sample.masks
         unet_features = sample.unet_features
+        saliency_map = sample.dino_saliency_map
 
         # Move the UNet features to cpu
         for key in unet_features.keys():
@@ -143,7 +145,12 @@ for epoch in range(n_epochs):
 
         for label, segmentation in zip(labels, segmentations):
             # Predict the mask using the fusion module
-            fusion_segmentation = seg_module(unet_features, label_embeddings[label])
+            fusion_segmentation = seg_module(
+                unet_features,
+                label_embeddings[label],
+                saliency_map.to(device)
+            )
+
             fusion_segmentation_pred = torch.unsqueeze(
                 fusion_segmentation[0, 0, :, :], 0
             ).unsqueeze(0)

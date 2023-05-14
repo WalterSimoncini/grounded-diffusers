@@ -12,7 +12,7 @@ from tqdm import tqdm
 from torchvision import transforms
 from torchvision.utils import make_grid
 
-from utils.visualization import plot_grid
+from seg_utils.visualization import plot_grid
 
 
 dataset_path = "dataset/images"

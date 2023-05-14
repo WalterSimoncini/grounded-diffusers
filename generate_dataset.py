@@ -8,8 +8,8 @@ import numpy as np
 
 from data import PromptsMultiClassSegmentationSample
 from mmdet.apis import init_detector, inference_detector
-from utils import load_stable_diffusion, has_mask_for_classes
-from utils.prompts import visual_adjectives_prompt
+from seg_utils import load_stable_diffusion, has_mask_for_classes
+from seg_utils.prompts import visual_adjectives_prompt
 
 
 # the number of classes in a single sample

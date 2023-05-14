@@ -8,7 +8,7 @@ import pickle
 import numpy as np
 
 from PIL import Image
-from utils import plot_mask
+from seg_utils import plot_mask
 from data import MultiClassSegmentationSample
 
 
