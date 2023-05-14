@@ -19,6 +19,34 @@ from utils import preprocess_mask, get_embeddings, plot_mask
 from loss_fn import BCEDiceLoss, DiceLoss, BCELogCoshDiceLoss
 
 
+class new_Module(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.conv = nn.Sequential(
+                nn.Conv2d(1, 2, 448),
+                nn.ReLU(),
+                nn.Flatten()
+        )
+
+        self.new_mlp = nn.Sequential(
+            nn.Linear(2*64*64, 2*512*512),
+            nn.Sigmoid()
+        )
+    
+    def forward(self, mask1, mask2):
+        features1 = self.conv(mask1)
+        features2 = self.conv(mask2)
+
+        features = torch.cat((features1,features2))
+        
+        output = self.new_mlp(features)
+
+        new_mask1 = output[:512*512].reshape((512,512))
+        new_mask2 = output[512*512:].reshape((512,512))
+
+        return (new_mask1,new_mask2)
+
 seed = 42
 n_epochs = 6
 use_sd2 = False
@@ -27,8 +55,8 @@ loss_name = "log_cosh"
 checkpoints_dir = "checkpoints"
 device = torch.device("cuda")
 model_name = "stabilityai/stable-diffusion-2" if use_sd2 else "runwayml/stable-diffusion-v1-5"
-data_path = "dataset/samples/"
-images_path = "dataset/images/"
+data_path = "/nfs/scratch/sample_data/samples/"
+images_path = "/nfs/scratch/sample_data/images/"
 learning_rate = 1e-5
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
@@ -132,12 +160,14 @@ for epoch in range(n_epochs):
             inverted_vocab=tokenizer_inverted_vocab
         )
 
+        fusion_segmentation_pred_arr = []
         for label, segmentation in zip(labels, segmentations):
             # Predict the mask using the fusion module
             fusion_segmentation = seg_module(unet_features, label_embeddings[label])
             fusion_segmentation_pred = torch.unsqueeze(
                 fusion_segmentation[0, 0, :, :], 0
             ).unsqueeze(0)
+            fusion_segmentation_pred_arr.append(fusion_segmentation_pred)
 
             if step % 25 == 0:
                 # FIXME: We should move these to Tensorboard
@@ -164,8 +194,16 @@ for epoch in range(n_epochs):
 
             # Calculate the loss and run one training step
             # FIXME: Try averaging the loss here
-            step_loss += loss_fn(fusion_segmentation_pred, segmentation)
+            # step_loss += loss_fn(fusion_segmentation_pred, segmentation)
 
+        newModule = new_Module()
+        mask1 = fusion_segmentation_pred_arr[0]
+        mask2 = fusion_segmentation_pred_arr[1]
+        new_fusion_segmentation_pred_arr = newModule.forward(mask1, mask2)
+
+        for i, segmentation in enumerate(segmentations):
+            step_loss += loss_fn(new_fusion_segmentation_pred_arr[i], segmentation)
+                
         optimizer.zero_grad()
         step_loss.backward()
         optimizer.step()
