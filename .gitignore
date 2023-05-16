@@ -180,3 +180,4 @@ checkpoints-legacy
 loss_single.sh
 normal_vs_hq.sh
 dataset-hq
+generations
