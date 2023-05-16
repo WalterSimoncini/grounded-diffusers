@@ -1,7 +1,9 @@
 import os
+import json
 import glob
 import torch
 import pickle
+import argparse
 import torchvision
 import numpy as np
 import torch.nn as nn
@@ -20,23 +22,31 @@ from utils import preprocess_mask, get_embeddings, plot_mask
 from loss_fn import BCEDiceLoss, DiceLoss, BCELogCoshDiceLoss
 
 
-seed = 42
-n_epochs = 10
-use_sd2 = False
-visualize_examples = False
-pascal_class_split = 1
-loss_name = "log_cosh"
-checkpoints_dir = "checkpoints"
-device = torch.device("cuda")
-model_name = "stabilityai/stable-diffusion-2" if use_sd2 else "runwayml/stable-diffusion-v1-5"
-train_data_path = "dataset/samples/"
-train_images_path = "dataset/images/"
-validation_data_path = "val_dataset/samples/"
-learning_rate = 1e-5
-
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
-seed_everything(seed)
+parser = argparse.ArgumentParser(prog="grounding  training")
+
+parser.add_argument("--seed", type=int, default=42)
+parser.add_argument("--use-sd2", action="store_true")
+parser.add_argument("--n-epochs", type=int, default=10)
+parser.add_argument("--dropout", type=float, default=0)
+parser.add_argument("--loss", type=str, default="log_cosh")
+parser.add_argument("--checkpoint-dir-prefix", type=str, default=None)
+
+parser.add_argument("--train-images-path", type=str, default="dataset-old/dataset/images/")
+parser.add_argument("--train-samples-path", type=str, default="dataset-old/dataset/samples/")
+
+parser.add_argument("--validation-samples-path", type=str, default="dataset-old/val_dataset/samples/")
+
+args = parser.parse_args()
+
+learning_rate = 1e-5
+visualize_examples = False
+device = torch.device("cuda")
+checkpoints_dir = "checkpoints"
+model_name = "stabilityai/stable-diffusion-2" if args.use_sd2 else "runwayml/stable-diffusion-v1-5"
+
+seed_everything(args.seed)
 
 os.makedirs(checkpoints_dir, exist_ok=True)
 
@@ -44,16 +54,16 @@ os.makedirs(checkpoints_dir, exist_ok=True)
 coco_classes = open("mmdetection/demo/coco_80_class.txt").read().split("\n")
 coco_classes = dict([(c, i) for i, c in enumerate(coco_classes)])
 
-pascal_classes = open(f"VOC/class_split{pascal_class_split}.csv").read().split("\n")
+pascal_classes = open(f"VOC/class_split1.csv").read().split("\n")
 pascal_classes = [c.split(",")[0] for c in pascal_classes]
 
 train_classes, test_classes = pascal_classes[:15], pascal_classes[15:]
 
 # Load the segmentation module
 seg_module = Segmodule(
-    use_sd2=use_sd2,
-    output_image_dim=768 if use_sd2 else 512,
-    dropout_rate=0.1
+    use_sd2=args.use_sd2,
+    output_image_dim=768 if args.use_sd2 else 512,
+    dropout_rate=args.dropout
 ).to(device)
 
 # Load the stable diffusion pipeline
@@ -74,13 +84,19 @@ print(f"starting training")
 
 # Create folders to store checkpoints, training data, etc.
 current_time = datetime.now().strftime("%b%d_%H-%M-%S")
-run_dir = os.path.join(checkpoints_dir, f"run-{current_time}")
+
+run_dir_prefix = "" if args.checkpoint_dir_prefix is None else f"{args.checkpoint_dir_prefix}-"
+run_dir = os.path.join(checkpoints_dir, f"{run_dir_prefix}{current_time}")
 
 run_logs_dir = os.path.join(run_dir, "logs")
 training_dir = os.path.join(run_dir, "training")
 
 os.makedirs(run_dir, exist_ok=True)
 os.makedirs(training_dir, exist_ok=True)
+
+# Save the training parameters
+with open(os.path.join(run_dir, "train_args.json"), "w") as args_file:
+    args_file.write(json.dumps(vars(args)))
 
 # Setup logger, optimizer and loss
 torch_writer = SummaryWriter(log_dir=run_logs_dir)
@@ -90,24 +106,24 @@ loss_fn = {
     "dice": DiceLoss(),
     "bce_dice": BCEDiceLoss(),
     "log_cosh": BCELogCoshDiceLoss()
-}[loss_name]
+}[args.loss]
 
 optimizer = optim.Adam(params=seg_module.parameters(), lr=learning_rate)
 
 best_val_miou, best_epoch = 0, 0
 
-training_samples = glob.glob(train_data_path + "*.pk")
-val_samples = glob.glob(validation_data_path + "*.pk")
+training_samples = glob.glob(args.train_samples_path + "*.pk")
+val_samples = glob.glob(args.validation_samples_path + "*.pk")
 
 total_steps = len(training_samples)
 
 if total_steps == 0:
-    print(f"{train_data_path} does not contain any data. make sure you added a trailing / to the path")
+    print(f"{args.train_samples_path} does not contain any data. make sure you added a trailing / to the path")
 
 if len(val_samples) == 0:
-    print(f"{validation_data_path} does not contain any data. make sure you added a trailing / to the path")
+    print(f"{args.validation_samples_path} does not contain any data. make sure you added a trailing / to the path")
 
-for epoch in range(n_epochs):
+for epoch in range(args.n_epochs):
     print(f"starting epoch {epoch}")
 
     seg_module.train()
@@ -162,7 +178,7 @@ for epoch in range(n_epochs):
 
                 # Also plot the mask over the image
                 filename = file_path.split("/")[-1].replace(".pk", ".png")
-                image = Image.open(os.path.join(train_images_path, filename))
+                image = Image.open(os.path.join(args.train_images_path, filename))
 
                 masked_image = Image.fromarray(plot_mask(np.array(image), fusion_mask))
                 masked_image.save(os.path.join(training_dir, f"vis_image_{epoch}_{step}_{label}_masked.png"))
@@ -223,3 +239,6 @@ for epoch in range(n_epochs):
 
         torch_writer.add_scalar("train/miou", train_miou, epoch)
         torch_writer.add_scalar("val/miou", val_miou, epoch)
+
+# Make sure all metrics are saved
+torch_writer.close()

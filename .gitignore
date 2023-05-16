@@ -174,3 +174,9 @@ dataset-test/*
 nohup.out
 val_dataset
 dataset-unseen
+dataset-old
+dataset-updated
+checkpoints-legacy
+loss_single.sh
+normal_vs_hq.sh
+dataset-hq
