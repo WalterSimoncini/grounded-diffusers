@@ -80,16 +80,17 @@ def get_embeddings(
         inverted_vocab=inverted_vocab
     )
 
+    input_ids_list = tokens["input_ids"].clone().squeeze()
+
     tokens["input_ids"] = tokens["input_ids"].to(device)
     tokens["attention_mask"] = tokens["attention_mask"].to(device)
 
-    input_ids_list = tokens["input_ids"]
-    token_embeddings = embedder(**tokens).last_hidden_state
     label_embeddings = {}
+    token_embeddings = embedder(**tokens).last_hidden_state
 
     for label in token_ids_mapping.keys():
         label_token_indices = torch.Tensor([
-            (input_ids_list == token_id).nonzero(as_tuple=True)[1]
+            (input_ids_list == token_id).nonzero(as_tuple=True)[0]
             for token_id in token_ids_mapping[label]
         ]).long()
 

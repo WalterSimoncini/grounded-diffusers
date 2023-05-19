@@ -24,9 +24,13 @@ parser.add_argument("--use-sd2", action="store_true")
 parser.add_argument("--output-dir", type=str, default="generations")
 parser.add_argument("--prompt", type=str, default="a photograph of a cat and a dog")
 parser.add_argument("--classes", type=str, default="cat,dog")
-parser.add_argument("--grounding_ckpt", type=str, default="checkpoints-legacy/log_cosh-May15_01-33-41/checkpoint_7_1000.pth")
+parser.add_argument("--grounding_ckpt", type=str, default="checkpoints/normal_arch_checkpoint.pth")
+parser.add_argument("--seed", type=int, default=2147483647)
 
 args = parser.parse_args()
+
+rand_generator = torch.Generator()
+rand_generator.manual_seed(args.seed)
 
 device = torch.device("cuda")
 model_name = "stabilityai/stable-diffusion-2" if args.use_sd2 else "runwayml/stable-diffusion-v1-5"
@@ -80,22 +84,13 @@ seg_module.eval()
 with torch.no_grad():
     classes = [c.strip() for c in args.classes.split(",")]
 
-    label_embeddings = get_embeddings(
-        tokenizer=tokenizer,
-        embedder=embedder,
-        device=device,
-        prompt=args.prompt,
-        labels=classes,
-        inverted_vocab=tokenizer_inverted_vocab
-    )
-
     print(f"Generating sample using prompt: {args.prompt}")
     print(f"The target classes are: {classes}")
 
     grounded_unet.clear_grounding_features()
 
     # Sample an image
-    image = pipeline(args.prompt).images[0]
+    image = pipeline(args.prompt, generator=rand_generator).images[0]
     array_image = np.array(image)
 
     # Get the Mask R-CNN segmentation
@@ -127,8 +122,30 @@ with torch.no_grad():
     # Get the UNet features
     unet_features = grounded_unet.get_grounding_features()
 
+    # Extract embeddings for each individual class,
+    # using the prompt "a photograph of a {x}"
+    single_class_embeddings = {}
+
     for label in classes:
-        fusion_segmentation = seg_module(unet_features, label_embeddings[label])
+        single_class_embeddings[label] = get_embeddings(
+            tokenizer=tokenizer,
+            embedder=embedder,
+            device=device,
+            prompt=f"a photograph of a {label}",
+            labels=[label],
+            inverted_vocab=tokenizer_inverted_vocab
+        )[label]
+
+    all_fusion_masks = []
+
+    for label in classes:
+        embedding = single_class_embeddings[label]
+
+        # Subtract the embeddings from all other classes
+        for other_label in set(classes) - set([label]):
+            embedding -= single_class_embeddings[other_label]
+
+        fusion_segmentation = seg_module(unet_features, embedding)
         fusion_segmentation_pred = fusion_segmentation[0, 0, :, :]
         fusion_mask = preprocess_mask(mask=fusion_segmentation_pred.unsqueeze(0))
 
@@ -144,6 +161,8 @@ with torch.no_grad():
         masked_image = Image.fromarray(plot_mask(np.array(image), np.expand_dims(fusion_mask, 0)))
         masked_image.save(os.path.join(args.output_dir, f"masked_image_{label}_segmodule.png"))
 
+        all_fusion_masks.append(fusion_mask)
+
         # Mask the original image and save the cutted out portion
         expanded_mask = np.stack([fusion_mask.astype(int)] * 3, axis=-1)
 
@@ -153,3 +172,6 @@ with torch.no_grad():
         Image.fromarray(extracted_image).save(
             os.path.join(args.output_dir, f"extracted_{label}_segmodule.png")
         )
+
+    all_fusion_image = Image.fromarray(plot_mask(np.array(image), all_fusion_masks))
+    all_fusion_image.save(os.path.join(args.output_dir, f"segmodule_all_masks.png"))

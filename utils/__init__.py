@@ -33,18 +33,17 @@ def plot_mask(img, masks, colors=None, alpha=0.8,indexlist=[0,1]) -> np.ndarray:
         The image plotted with segmentation masks, shape `(H, W, 3)`
 
     """
-    H, W = masks.shape[1], masks.shape[2]
-    color_list=[[255,97,0],[128,42,42],[220,220,220],[255,153,18],[56,94,15],[127,255,212],[210,180,140],[221,160,221],[255,0,0],[255,128,0],[255,255,0],[128,255,0],[0,255,0],[0,255,128],[0,255,255],[0,128,255],[0,0,255],[128,0,255],[255,0,255],[255,0,128]]*6
+    H, W = masks[0].shape[0], masks[0].shape[1]
+    color_list=[[255,97,0],[0,128,255],[127,255,212],[128,42,42],[220,220,220],[255,153,18],[56,94,15],[210,180,140],[221,160,221],[255,0,0],[255,128,0],[255,255,0],[128,255,0],[0,255,0],[0,255,128],[0,255,255],[0,0,255],[128,0,255],[255,0,255],[255,0,128]]*6
     final_color_list=[np.array([[i]*H]*W) for i in color_list]
-    
-    background=np.ones(img.shape)*255
-    count=0
-    colors=final_color_list[indexlist[count]]
+
+    count = 0
+    colors = final_color_list[indexlist[count]]
 
     for mask, color in zip(masks, colors):
         color=final_color_list[indexlist[count]]
         mask = np.stack([mask, mask, mask], -1)
-        img = np.where(mask, img * (1 - alpha) + color * alpha,background*0.4+img*0.6 )
+        img = np.where(mask, img * (1 - alpha) + color * alpha, img)
         count+=1
 
     return img.astype(np.uint8)
