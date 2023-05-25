@@ -1,28 +1,45 @@
 import os
 import json
 import time
-import torch
 import pickle
 import random
+import argparse
 import numpy as np
 
 from data import PromptsMultiClassSegmentationSample
 from mmdet.apis import init_detector, inference_detector
-from utils import load_stable_diffusion, has_mask_for_classes
-from utils.prompts import visual_adjectives_prompt
+
+from utils import (
+    get_default_device,
+    load_stable_diffusion,
+    has_mask_for_classes,
+    DatasetGenerationType
+)
 
 
-# the number of classes in a single sample
-n_classes = 2
-total_samples = 500
-output_dir = "dataset_test"
-pascal_class_split = 1
-device = torch.device("cuda")
-model_name = "runwayml/stable-diffusion-v1-5"
-model_type = model_name.split("/")[-1]
+parser = argparse.ArgumentParser(prog="dataset generation")
 
-images_dir = os.path.join(output_dir, "images")
-samples_dir = os.path.join(output_dir, "samples")
+parser.add_argument("--output-dir", type=str, default="generated_dataset")
+parser.add_argument("--n-classes", type=int, default=2)
+parser.add_argument("--total-samples", type=int, default=500)
+parser.add_argument("--pascal-class-split", type=int, default=1)
+parser.add_argument("--model-name", type=str, default="runwayml/stable-diffusion-v1-5")
+parser.add_argument(
+    "--dataset-type",
+    type=str,
+    help="the type of dataset to be generated ['seen', 'seen_unseen', 'unseen']",
+    choices=list([x.value for x in DatasetGenerationType])
+)
+
+args = parser.parse_args()
+
+args.dataset_type = DatasetGenerationType(args.dataset_type)
+
+device = get_default_device()
+model_type = args.model_name.split("/")[-1]
+
+images_dir = os.path.join(args.output_dir, "images")
+samples_dir = os.path.join(args.output_dir, "samples")
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
@@ -31,7 +48,7 @@ mask_rnn_config = {
   "checkpoint": "mmdetection/checkpoint/mask_rcnn_swin-s-p4-w7_fpn_fp16_ms-crop-3x_coco_20210903_104808-b92c91f1.pth"
 }
 
-os.makedirs(output_dir, exist_ok=True)
+os.makedirs(args.output_dir, exist_ok=True)
 os.makedirs(images_dir, exist_ok=True)
 os.makedirs(samples_dir, exist_ok=True)
 
@@ -39,7 +56,7 @@ os.makedirs(samples_dir, exist_ok=True)
 coco_classes = open("mmdetection/demo/coco_80_class.txt").read().split("\n")
 coco_classes = dict([(c, i) for i, c in enumerate(coco_classes)])
 
-pascal_classes = open(f"VOC/class_split{pascal_class_split}.csv").read().split("\n")
+pascal_classes = open(f"VOC/class_split{args.pascal_class_split}.csv").read().split("\n")
 pascal_classes = [c.split(",")[0] for c in pascal_classes]
 
 train_classes, test_classes = pascal_classes[:15], pascal_classes[15:]
@@ -56,30 +73,28 @@ pretrain_detector = init_detector(
 )
 
 execution_time = int(time.time())
-pipeline, grounded_unet = load_stable_diffusion(model_name=model_name, device=device)
+pipeline, grounded_unet = load_stable_diffusion(
+    model_name=args.model_name,
+    device=device
+)
 
-for i in range(total_samples):
+for i in range(args.total_samples):
     # Pick classes
-    picked_classes = random.sample(train_classes, n_classes)
+    if args.dataset_type == DatasetGenerationType.SEEN:
+        picked_classes = random.sample(train_classes, args.n_classes)
+    elif args.dataset_type == DatasetGenerationType.UNSEEN:
+        picked_classes = random.sample(test_classes, args.n_classes)
+    else:
+        picked_classes = [
+            random.choice(train_classes),
+            random.choice(test_classes)
+        ]
+
     class_indices = [coco_classes[x] for x in picked_classes]
 
-    # Add visual adjectives to classes
-    visual_picked_classes = [
-        visual_adjectives_prompt(
-            label=label,
-            visual_adjectives=visual_adjectives
-        ) for label in picked_classes
-    ]
-
-    camera_angle = random.choice(camera_parameters["camera_angle"])
-    camera_position = random.choice(camera_parameters["camera_position"])
-
-    # Either pick a camera angle or a camera position
-    camera_parameter = random.choice([camera_angle, camera_position])
-
     # Build a prompt
-    prompt_classes = " and a ".join(visual_picked_classes)
-    prompt = f"a photograph of a {prompt_classes} {camera_parameter}"
+    prompt_classes = " and a ".join(picked_classes)
+    prompt = f"a photograph of a {prompt_classes}"
 
     print(f"generating sample {i} for classes {picked_classes}")
     print(f"the prompt is: {prompt}")
@@ -129,8 +144,8 @@ for i in range(total_samples):
         masks=segmented_classes,
         unet_features=unet_features,
         labels=picked_classes,
-        visual_labels=visual_picked_classes,
-        camera_parameters=[camera_parameter]
+        visual_labels=None,
+        camera_parameters=None
     )
 
     image.save(os.path.join(images_dir, f"{execution_time}_{i}.png"))
