@@ -1,7 +1,12 @@
 # Grounded Diffusers
 
 This repository builds on top of the paper [Guiding Text-to-Image Diffusion Model Towards Grounded Generation
-](https://arxiv.org/abs/2301.05221) whose code is available [here](https://github.com/Lipurple/Grounded-Diffusion) and re-implements it using the HuggingFace's [diffusers](https://github.com/huggingface/diffusers) library in addition to several improvements
+](https://arxiv.org/abs/2301.05221) whose code is available [here](https://github.com/Lipurple/Grounded-Diffusion) and re-implements it using the HuggingFace's [diffusers](https://github.com/huggingface/diffusers) library in addition to several improvements including:
+
+- Decoupled dataset generation and training
+- Support for multiple objects in an image
+- Multi-epoch training
+- Choice of loss function (BCE, Dice, Dice + BCE, Log-Cosh + BCE)
 
 ## Environment setup
 
@@ -12,7 +17,7 @@ conda create --name gdiff python==3.10
 sh setup_env.sh
 ```
 
-The setup script will install the required dependencies and download a Mask R-CNN checkpoint and a checkpoint for the grounding module trained on 10k images with two objects from different classes selected between the first 15 classes of the split 1 of Pascal VOC, located in `VOC/class_split1.csv`. The grounding module was trained using Stable Diffusion 1.5, so it's not compatible with Stable Diffusion 2.
+The setup script will install the required dependencies and download Mask R-CNN and grounding checkpoints. The latter was trained on 10k images with two objects from different classes selected between the first 15 classes of the split 1 of Pascal VOC, located in `VOC/class_split1.csv`. The grounding module was trained using Stable Diffusion 1.5, so it's not compatible with Stable Diffusion 2.
 
 ## Running the code
 
