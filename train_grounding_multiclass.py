@@ -18,9 +18,13 @@ from torch.utils.tensorboard import SummaryWriter
 
 from seg_module import Segmodule
 from utils.evaluation import evaluate_seg_model
-from utils import preprocess_mask, get_embeddings, plot_mask
 from loss_fn import BCEDiceLoss, DiceLoss, BCELogCoshDiceLoss
-
+from utils import (
+    plot_mask,
+    get_embeddings,
+    preprocess_mask,
+    get_default_device
+)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
@@ -31,7 +35,10 @@ parser.add_argument("--use-sd2", action="store_true")
 parser.add_argument("--n-epochs", type=int, default=10)
 parser.add_argument("--dropout", type=float, default=0)
 parser.add_argument("--loss", type=str, default="log_cosh")
-parser.add_argument("--checkpoint-dir-prefix", type=str, default=None)
+parser.add_argument("--run-name", type=str, default=None)
+parser.add_argument("--checkpoints-dir", type=str, default="checkpoints")
+parser.add_argument("--learning-rate", type=float, default=1e-5)
+parser.add_argument("--visualize-examples", action="store_true")
 
 parser.add_argument("--train-images-path", type=str, default="dataset-old/dataset/images/")
 parser.add_argument("--train-samples-path", type=str, default="dataset-old/dataset/samples/")
@@ -39,16 +46,13 @@ parser.add_argument("--train-samples-path", type=str, default="dataset-old/datas
 parser.add_argument("--validation-samples-path", type=str, default="dataset-old/val_dataset/samples/")
 
 args = parser.parse_args()
+device = get_default_device()
 
-learning_rate = 1e-5
-visualize_examples = False
-device = torch.device("cuda")
-checkpoints_dir = "checkpoints"
 model_name = "stabilityai/stable-diffusion-2" if args.use_sd2 else "runwayml/stable-diffusion-v1-5"
 
 seed_everything(args.seed)
 
-os.makedirs(checkpoints_dir, exist_ok=True)
+os.makedirs(args.checkpoints_dir, exist_ok=True)
 
 # Load COCO and Pascal-VOC classes
 coco_classes = open("mmdetection/demo/coco_80_class.txt").read().split("\n")
@@ -85,8 +89,8 @@ print(f"starting training")
 # Create folders to store checkpoints, training data, etc.
 current_time = datetime.now().strftime("%b%d_%H-%M-%S")
 
-run_dir_prefix = "" if args.checkpoint_dir_prefix is None else f"{args.checkpoint_dir_prefix}-"
-run_dir = os.path.join(checkpoints_dir, f"{run_dir_prefix}{current_time}")
+run_dir_prefix = "" if args.run_name is None else f"{args.run_name}-"
+run_dir = os.path.join(args.checkpoints_dir, f"{run_dir_prefix}{current_time}")
 
 run_logs_dir = os.path.join(run_dir, "logs")
 training_dir = os.path.join(run_dir, "training")
@@ -108,7 +112,7 @@ loss_fn = {
     "log_cosh": BCELogCoshDiceLoss()
 }[args.loss]
 
-optimizer = optim.Adam(params=seg_module.parameters(), lr=learning_rate)
+optimizer = optim.Adam(params=seg_module.parameters(), lr=args.learning_rate)
 
 best_val_miou, best_epoch = 0, 0
 
@@ -117,11 +121,8 @@ val_samples = glob.glob(args.validation_samples_path + "*.pk")
 
 total_steps = len(training_samples)
 
-if total_steps == 0:
-    print(f"{args.train_samples_path} does not contain any data. make sure you added a trailing / to the path")
-
-if len(val_samples) == 0:
-    print(f"{args.validation_samples_path} does not contain any data. make sure you added a trailing / to the path")
+assert total_steps > 0, f"{args.train_samples_path} does not contain any data. make sure you added a trailing / to the path"
+assert len(val_samples) > 0, f"{args.validation_samples_path} does not contain any data. make sure you added a trailing / to the path"
 
 for epoch in range(args.n_epochs):
     print(f"starting epoch {epoch}")
@@ -164,7 +165,7 @@ for epoch in range(args.n_epochs):
                 fusion_segmentation[0, 0, :, :], 0
             ).unsqueeze(0)
 
-            if step % 25 == 0 and visualize_examples:
+            if step % 25 == 0 and args.visualize_examples:
                 # FIXME: We should move these to Tensorboard
                 # Save the fusion module mask every 25 steps
                 fusion_mask = preprocess_mask(mask=fusion_segmentation_pred)
@@ -197,7 +198,7 @@ for epoch in range(args.n_epochs):
 
         torch_writer.add_scalar("train/loss", step_loss.item(), global_step=step)
 
-        if step % 500 == 0 and step > 0:
+        if step % 500 == 0 and epoch > 0:
             # Save a checkpoint every 500 steps
             torch.save(
                 seg_module.state_dict(),

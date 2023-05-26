@@ -1,45 +1,44 @@
 """
     This script calculates the mean IoU for a grounding
-    module checkpoint for a dataset.
-
-    This is a work in progress!
+    module checkpoint for a given dataset.
 """
 import os
 import glob
 import torch
 import pickle
+import argparse
 import numpy as np
 
 from tqdm import tqdm
 from diffusers import StableDiffusionPipeline
 from seg_module import Segmodule
-from utils import preprocess_mask, get_embeddings, calculate_iou, seed_everything
+from utils import preprocess_mask, get_embeddings, calculate_iou, get_default_device
 
 
-seed = 42
-use_sd2 = False
-batch_size = 1
-grounding_checkpoint = "checkpoints/run-May13_11-16-27/checkpoint_9_1000.pth"
-device = torch.device("cuda")
-model_name = "stabilityai/stable-diffusion-2" if use_sd2 else "runwayml/stable-diffusion-v1-5"
-data_path = "dataset-unseen/samples/"
+parser = argparse.ArgumentParser(prog="grounding  training")
 
-seed_everything(seed)
+parser.add_argument("--use-sd2", action="store_true")
+parser.add_argument("--grounding-ckpt", type=str, default="checkpoints/mock-May25_20-45-58/checkpoint_3_0.pth")
+parser.add_argument("--model-name", type=str, default="runwayml/stable-diffusion-v1-5")
+parser.add_argument("--samples-path", type=str, default="val/samples/")
+
+args = parser.parse_args()
+device = get_default_device()
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Load the segmentation module
 seg_module = Segmodule(
-    use_sd2=use_sd2,
-    output_image_dim=768 if use_sd2 else 512
+    use_sd2=args.use_sd2,
+    output_image_dim=768 if args.use_sd2 else 512
 ).to(device)
 
 seg_module.load_state_dict(
-    torch.load(grounding_checkpoint, map_location=device), strict=True
+    torch.load(args.grounding_ckpt, map_location=device), strict=True
 )
 
 # Load the stable diffusion pipeline
-pipeline = StableDiffusionPipeline.from_pretrained(model_name).to(device)
+pipeline = StableDiffusionPipeline.from_pretrained(args.model_name).to(device)
 pipeline_components = pipeline.components
 
 # Setup tokenizer and the CLIP embedder
@@ -51,12 +50,12 @@ tokenizer_inverted_vocab = {
     v: k for k, v in tokenizer.get_vocab().items()
 }
 
-test_samples = glob.glob(data_path + "*.pk")
+test_samples = glob.glob(args.samples_path + "*.pk")
 total_steps = len(test_samples)
 
 if total_steps == 0:
     raise ValueError(
-        f"{data_path} does not contain any data. "
+        f"{args.samples_path} does not contain any data. "
         "make sure you added a trailing / to the data_path"
     )
 
@@ -104,4 +103,4 @@ with torch.no_grad():
 
     mean_iou = np.array(iou_scores).mean()
 
-    print(f"the mean IoU across the dataset at {data_path} using the checkpoint {grounding_checkpoint} is {mean_iou}")
+    print(f"the mean IoU across the dataset at {args.samples_path} using the checkpoint {args.grounding_ckpt} is {mean_iou}")

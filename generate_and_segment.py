@@ -13,7 +13,7 @@ import numpy as np
 from PIL import Image
 from seg_module import Segmodule
 from mmdet.apis import init_detector, inference_detector
-from utils import preprocess_mask, get_embeddings, plot_mask, load_stable_diffusion
+from utils import preprocess_mask, get_embeddings, plot_mask, load_stable_diffusion, seed_everything
 
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -24,10 +24,12 @@ parser.add_argument("--use-sd2", action="store_true")
 parser.add_argument("--output-dir", type=str, default="generations")
 parser.add_argument("--prompt", type=str, default="a photograph of a cat and a dog")
 parser.add_argument("--classes", type=str, default="cat,dog")
-parser.add_argument("--grounding_ckpt", type=str, default="checkpoints/normal_arch_checkpoint.pth")
+parser.add_argument("--grounding-ckpt", type=str, default="checkpoints/normal_arch_checkpoint.pth")
 parser.add_argument("--seed", type=int, default=2147483647)
 
 args = parser.parse_args()
+
+seed_everything(args.seed)
 
 rand_generator = torch.Generator()
 rand_generator.manual_seed(args.seed)

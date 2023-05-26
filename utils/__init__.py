@@ -3,6 +3,7 @@ import torch
 import random
 import numpy as np
 
+from enum import Enum
 from typing import Tuple, List
 
 from diffusers import StableDiffusionPipeline
@@ -10,6 +11,12 @@ from grounded_unet import GroundedUNet2DConditionModel
 
 from .prompts import get_embeddings
 from .segmentation import preprocess_mask, calculate_iou
+
+
+class DatasetGenerationType(Enum):
+    SEEN = "seen"
+    UNSEEN = "unseen"
+    SEEN_UNSEEN = "seen_unseen"
 
 
 def plot_mask(img, masks, colors=None, alpha=0.8,indexlist=[0,1]) -> np.ndarray:
@@ -94,6 +101,13 @@ def has_mask_for_classes(masks: List[List], class_indices: List[int]) -> bool:
 
 
 def seed_everything(seed):
-   random.seed(seed)
-   np.random.seed(seed)
-   torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
+def get_default_device():
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+
+    return torch.device("cpu")
