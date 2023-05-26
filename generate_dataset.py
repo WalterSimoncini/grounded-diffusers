@@ -85,10 +85,10 @@ for i in range(args.total_samples):
     elif args.dataset_type == DatasetGenerationType.UNSEEN:
         picked_classes = random.sample(test_classes, args.n_classes)
     else:
-        picked_classes = [
-            random.choice(train_classes),
-            random.choice(test_classes)
-        ]
+        assert args.n_classes % 2 == 0, "the number of objects must be even for seen/unseen datasets"
+
+        picked_classes = random.sample(train_classes, int(args.n_classes / 2))
+        picked_classes += random.sample(test_classes, int(args.n_classes / 2))
 
     class_indices = [coco_classes[x] for x in picked_classes]
 
