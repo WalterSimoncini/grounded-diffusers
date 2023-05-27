@@ -181,3 +181,10 @@ loss_single.sh
 normal_vs_hq.sh
 dataset-hq
 generations
+generate.sh
+image_grid.py
+deliberate.safetensors
+generations-paper.tar.gz
+test.sh
+header_masks
+header_masks.tar.gz
