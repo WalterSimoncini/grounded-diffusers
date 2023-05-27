@@ -119,9 +119,6 @@ python generate_and_segment.py \
     --n-images 5
 ```
 
-
-a turtle climbing on top of a reef in the pacific ocean. photorealistic digital art, cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, 3 d ue 5, 4 k, hq
-
 ```sh
 python generate_and_segment.py \
     --prompt "a turtle climbing on top of a reef in the pacific ocean. photorealistic digital art, cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, 3 d ue 5, 4 k, hq" \
