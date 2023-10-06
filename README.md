@@ -111,3 +111,95 @@ python evaluate_multi_class.py \
     }
 ]
 ```
+
+### Commands used to generate the paper images
+
+```sh
+python generate_and_segment.py \
+    --prompt "a photograph of a bear in a pine forest observing an abandoned refrigerator" \
+    --classes "bear,refrigerator" \
+    --mask-rcnn-classes "bear,refrigerator" \
+    --n-images 5
+
+python generate_and_segment.py \
+    --prompt "a photograph of a tennisplayer hitting a tennis ball with his racket" \
+    --classes "racket,person" \
+    --mask-rcnn-classes "person,tennis racket" \
+    --n-images 5
+```
+
+```sh
+python generate_and_segment.py \
+    --prompt "a turtle climbing on top of a reef in the pacific ocean. photorealistic digital art, cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, 3 d ue 5, 4 k, hq" \
+    --classes "turtle" \
+    --skip-mask-rcnn \
+    --n-images 3
+
+python generate_and_segment.py \
+    --prompt "a flamingo standing next to a yacht. photorealistic digital art, cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, 3 d ue 5, 4 k, hq" \
+    --classes "flamingo,yacht" \
+    --skip-mask-rcnn \
+    --n-images 5
+
+python generate_and_segment.py \
+    --prompt "a long shot photograph of an elephant standing in front of the pyramids. photorealistic digital art, cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, 3 d ue 5, 4 k, hq" \
+    --classes "elephant" \
+    --skip-mask-rcnn \
+    --n-images 5
+
+python generate_and_segment.py \
+    --prompt "a long shot photograph of an elephant standing in front of an eurofighter jet. photorealistic digital art, cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, 3 d ue 5, 4 k, hq" \
+    --classes "elephant,eurofighter" \
+    --skip-mask-rcnn \
+    --n-images 5
+
+python generate_and_segment.py \
+    --prompt "a wooden barrel next to a cactus outside of a saloon in late 1800s austin texas. cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, colorful, 4k, hq" \
+    --classes "barrel,cactus" \
+    --skip-mask-rcnn \
+    --n-images 5
+
+python generate_and_segment.py \
+    --prompt "a photograph of a plate of carbonara pasta. cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, colorful, 4k, hq" \
+    --classes "carbonara" \
+    --skip-mask-rcnn \
+    --n-images 5
+
+python generate_and_segment.py \
+    --prompt "a photograph of a lamborghini murcielago. cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, colorful, 4k, hq" \
+    --classes "lamborghini" \
+    --skip-mask-rcnn \
+    --n-images 5
+
+# Generated with the fine-tuned checkpoint
+# https://civitai.com/models/4823/deliberate
+python generate_and_segment.py \
+    --prompt "a long shot photograph of a man standing in front of of a ferrari testarossa. cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, colorful, 4k, hq" \
+    --classes "ferrari,person" \
+    --skip-mask-rcnn \
+    --n-images 5
+
+python generate_and_segment.py \
+    --prompt "a long shot photograph of lion chasing a zebra in the african savannah. cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, colorful, 4k, hq" \
+    --classes "lion,zebra" \
+    --skip-mask-rcnn \
+    --n-images 5
+
+python generate_and_segment.py \
+    --prompt "a photograph of a sushi platter next to an ashai beer can on top of a table. cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, colorful, 4k, hq" \
+    --classes "sushi,beercan" \
+    --skip-mask-rcnn \
+    --n-images 5
+
+python generate_and_segment.py \
+    --prompt "a photograph of an alpaca standing next to a park bench. cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, colorful, 4k, hq" \
+    --classes "alpaca,parkbench" \
+    --skip-mask-rcnn \
+    --n-images 5
+
+python generate_and_segment.py \
+    --prompt "a portrait of an explorer dressed in the style of indiana jones wearing a hat in front of an egyptian sphinx. photorealistic digital art, cinematic, extremely high detail, cinematic lighting, trending, artstation, cgsociety, colorful, 4k, hq" \
+    --classes "explorer" \
+    --skip-mask-rcnn \
+    --n-images 5
+```

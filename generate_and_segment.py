@@ -20,11 +20,15 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 parser = argparse.ArgumentParser(prog="grounded generation")
 
-parser.add_argument("--use-sd2", action="store_true")
+parser.add_argument("--use-sd2", action=argparse.BooleanOptionalAction)
+parser.add_argument("--skip-mask-rcnn", action=argparse.BooleanOptionalAction)
 parser.add_argument("--output-dir", type=str, default="generations")
 parser.add_argument("--prompt", type=str, default="a photograph of a cat and a dog")
+parser.add_argument("--negative-prompt", type=str, default=None)
 parser.add_argument("--classes", type=str, default="cat,dog")
-parser.add_argument("--grounding-ckpt", type=str, default="checkpoints/normal_arch_checkpoint.pth")
+parser.add_argument("--mask-rcnn-classes", type=str, default="cat,dog")
+parser.add_argument("--grounding-ckpt", type=str, default="mmdetection/checkpoint/grounding_module.pth")
+parser.add_argument("--n-images", type=int, default=1)
 parser.add_argument("--seed", type=int, default=2147483647)
 
 args = parser.parse_args()
@@ -44,7 +48,9 @@ mask_rnn_config = {
 
 # Load COCO classes
 coco_classes = open("mmdetection/demo/coco_80_class.txt").read().split("\n")
-coco_classes = dict([(i, c) for i, c in enumerate(coco_classes)])
+
+class2label = dict([(i, c) for i, c in enumerate(coco_classes)])
+label2class = dict([(c, i) for i, c in enumerate(coco_classes)])
 
 # Add the current timestamp to the output folder
 args.output_dir = os.path.join(args.output_dir, str(int(time.time())))
@@ -86,94 +92,120 @@ seg_module.eval()
 with torch.no_grad():
     classes = [c.strip() for c in args.classes.split(",")]
 
-    print(f"Generating sample using prompt: {args.prompt}")
-    print(f"The target classes are: {classes}")
+    mask_rcnn_classes = [c.strip() for c in args.mask_rcnn_classes.split(",")]
+    mask_rcnn_classes = [c for c in mask_rcnn_classes if c in label2class]
 
-    grounded_unet.clear_grounding_features()
+    for i in range(args.n_images):
+        image_dir = os.path.join(args.output_dir, str(i))
+        os.makedirs(image_dir, exist_ok=True)
 
-    # Sample an image
-    image = pipeline(args.prompt, generator=rand_generator).images[0]
-    array_image = np.array(image)
+        print(f"Generating sample {i} using prompt: {args.prompt}")
+        print(f"The target classes are: {classes}")
 
-    # Get the Mask R-CNN segmentation
-    _, mask_rcnn_segmentations = inference_detector(
-        pretrain_detector,
-        [array_image]
-    ).pop()
+        grounded_unet.clear_grounding_features()
 
-    # Save all masks from Mask R-CNN
-    for i, masks in enumerate(mask_rcnn_segmentations):
-        if len(masks) == 0:
-            continue
+        # Sample an image
+        image = pipeline(
+            prompt=args.prompt,
+            negative_prompt=args.negative_prompt,
+            generator=rand_generator
+        ).images[0]
 
-        masked_image = Image.fromarray(plot_mask(
-            np.array(image),
-            np.expand_dims(masks[0], 0)
-        ))
+        array_image = np.array(image)
 
-        masked_image.save(
-            os.path.join(
-                args.output_dir,
-                f"masked_image_{coco_classes[i]}_mask_rcnn.png"
+        # Get the Mask R-CNN segmentation
+        _, mask_rcnn_segmentations = inference_detector(
+            pretrain_detector,
+            [array_image]
+        ).pop()
+
+        if not args.skip_mask_rcnn:
+            picked_rcnn_masks = []
+
+            # Save all masks from Mask R-CNN
+            for i, masks in enumerate(mask_rcnn_segmentations):
+                if len(masks) == 0:
+                    continue
+
+                masked_image = Image.fromarray(plot_mask(
+                    np.array(image),
+                    np.expand_dims(masks[0], 0)
+                ))
+
+                mask_rcnn_label = class2label[i]
+
+                if mask_rcnn_label in mask_rcnn_classes:
+                    picked_rcnn_masks.append(masks[0])
+
+                masked_image.save(
+                    os.path.join(
+                        image_dir,
+                        f"masked_image_{mask_rcnn_label}_mask_rcnn.png"
+                    )
+                )
+
+            # Visualize all the target Mask R-CNN masks at one
+            if len(picked_rcnn_masks) > 0:
+                all_mask_rcnn_image = Image.fromarray(plot_mask(np.array(image), picked_rcnn_masks))
+                all_mask_rcnn_image.save(os.path.join(image_dir, f"mask_rcnn_all_masks.png"))
+
+        # Save the genearted image
+        image.save(os.path.join(image_dir, f"sd_image.png"))
+
+        # Get the UNet features
+        unet_features = grounded_unet.get_grounding_features()
+
+        # Extract embeddings for each individual class,
+        # using the prompt "a photograph of a {x}"
+        single_class_embeddings = {}
+
+        for label in classes:
+            single_class_embeddings[label] = get_embeddings(
+                tokenizer=tokenizer,
+                embedder=embedder,
+                device=device,
+                prompt=label,
+                # prompt=f"a photograph of a {label}",
+                labels=[label],
+                inverted_vocab=tokenizer_inverted_vocab
+            )[label]
+
+        all_fusion_masks = []
+
+        for label in classes:
+            embedding = single_class_embeddings[label]
+
+            # Subtract the embeddings from all other classes
+            for other_label in set(classes) - set([label]):
+                embedding -= single_class_embeddings[other_label]
+
+            fusion_segmentation = seg_module(unet_features, embedding)
+            fusion_segmentation_pred = fusion_segmentation[0, 0, :, :]
+            fusion_mask = preprocess_mask(mask=fusion_segmentation_pred.unsqueeze(0))
+
+            # Save the fusion mask
+            torchvision.utils.save_image(
+                torch.from_numpy(fusion_mask),
+                os.path.join(image_dir, f"mask_{label}_segmodule.png"),
+                normalize=True,
+                scale_each=True,
             )
-        )
 
-    # Save the genearted image
-    image.save(os.path.join(args.output_dir, f"sd_image.png"))
+            # Also plot the mask over the image
+            masked_image = Image.fromarray(plot_mask(np.array(image), np.expand_dims(fusion_mask, 0)))
+            masked_image.save(os.path.join(image_dir, f"masked_image_{label}_segmodule.png"))
 
-    # Get the UNet features
-    unet_features = grounded_unet.get_grounding_features()
+            all_fusion_masks.append(fusion_mask)
 
-    # Extract embeddings for each individual class,
-    # using the prompt "a photograph of a {x}"
-    single_class_embeddings = {}
+            # Mask the original image and save the cutted out portion
+            expanded_mask = np.stack([fusion_mask.astype(int)] * 3, axis=-1)
 
-    for label in classes:
-        single_class_embeddings[label] = get_embeddings(
-            tokenizer=tokenizer,
-            embedder=embedder,
-            device=device,
-            prompt=f"a photograph of a {label}",
-            labels=[label],
-            inverted_vocab=tokenizer_inverted_vocab
-        )[label]
+            extracted_image = np.array(image)
+            extracted_image[expanded_mask == 0] = 0
 
-    all_fusion_masks = []
+            Image.fromarray(extracted_image).save(
+                os.path.join(image_dir, f"extracted_{label}_segmodule.png")
+            )
 
-    for label in classes:
-        embedding = single_class_embeddings[label]
-
-        # Subtract the embeddings from all other classes
-        for other_label in set(classes) - set([label]):
-            embedding -= single_class_embeddings[other_label]
-
-        fusion_segmentation = seg_module(unet_features, embedding)
-        fusion_segmentation_pred = fusion_segmentation[0, 0, :, :]
-        fusion_mask = preprocess_mask(mask=fusion_segmentation_pred.unsqueeze(0))
-
-        # Save the fusion mask
-        torchvision.utils.save_image(
-            torch.from_numpy(fusion_mask),
-            os.path.join(args.output_dir, f"mask_{label}_segmodule.png"),
-            normalize=True,
-            scale_each=True,
-        )
-
-        # Also plot the mask over the image
-        masked_image = Image.fromarray(plot_mask(np.array(image), np.expand_dims(fusion_mask, 0)))
-        masked_image.save(os.path.join(args.output_dir, f"masked_image_{label}_segmodule.png"))
-
-        all_fusion_masks.append(fusion_mask)
-
-        # Mask the original image and save the cutted out portion
-        expanded_mask = np.stack([fusion_mask.astype(int)] * 3, axis=-1)
-
-        extracted_image = np.array(image)
-        extracted_image[expanded_mask == 0] = 0
-
-        Image.fromarray(extracted_image).save(
-            os.path.join(args.output_dir, f"extracted_{label}_segmodule.png")
-        )
-
-    all_fusion_image = Image.fromarray(plot_mask(np.array(image), all_fusion_masks))
-    all_fusion_image.save(os.path.join(args.output_dir, f"segmodule_all_masks.png"))
+        all_fusion_image = Image.fromarray(plot_mask(np.array(image), all_fusion_masks))
+        all_fusion_image.save(os.path.join(image_dir, f"segmodule_all_masks.png"))
